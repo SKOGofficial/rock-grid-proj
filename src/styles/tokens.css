@@ -1,0 +1,95 @@
+/*
+ * Design tokens.
+ *
+ * Every colour, radius, and shadow in the app resolves through a variable defined here. The
+ * light palette is the base; the dark block only overrides the values that change, so the two
+ * themes cannot drift apart.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Surfaces, from furthest back to nearest front. */
+  --surface-base: #f6f7f9;
+  --surface-raised: #ffffff;
+  --surface-sunken: #eceef2;
+  --surface-inverted: #14171c;
+
+  /* Text. */
+  --text-primary: #14171c;
+  --text-secondary: #5b6470;
+  --text-tertiary: #8b95a3;
+  --text-on-accent: #ffffff;
+
+  /* Lines. */
+  --border-subtle: rgba(20, 23, 28, 0.09);
+  --border-strong: rgba(20, 23, 28, 0.18);
+
+  /* Accent. A saturated cyan reads as "instrument", not "brand", and stays legible on the white
+     of a drawing sheet - which matters because the selection outline is drawn on top of one. */
+  --accent: #0d7d8f;
+  --accent-hover: #0a6373;
+  --accent-soft: rgba(13, 125, 143, 0.1);
+  --accent-ring: rgba(13, 125, 143, 0.32);
+
+  /* The selection box sits over white paper and thin black linework, so it needs a hue neither
+     of those occupies. */
+  --selection-stroke: #ff5c1f;
+  --selection-fill: rgba(255, 92, 31, 0.12);
+  --selection-glow: rgba(255, 92, 31, 0.4);
+
+  --status-ready-bg: rgba(13, 125, 143, 0.12);
+  --status-ready-fg: #0a6373;
+  --status-planned-bg: rgba(20, 23, 28, 0.06);
+  --status-planned-fg: #5b6470;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --shadow-sm: 0 1px 2px rgba(20, 23, 28, 0.06), 0 1px 1px rgba(20, 23, 28, 0.04);
+  --shadow-md: 0 4px 16px rgba(20, 23, 28, 0.08), 0 1px 2px rgba(20, 23, 28, 0.05);
+  --shadow-lg: 0 16px 48px rgba(20, 23, 28, 0.16), 0 2px 8px rgba(20, 23, 28, 0.08);
+
+  --font-sans:
+    'Inter var', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace;
+
+  --ease: cubic-bezier(0.2, 0, 0.1, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-base: #0e1013;
+    --surface-raised: #171a1f;
+    --surface-sunken: #090a0c;
+    --surface-inverted: #f6f7f9;
+
+    --text-primary: #e9ecf1;
+    --text-secondary: #99a3b0;
+    --text-tertiary: #6b7481;
+    --text-on-accent: #04181c;
+
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+
+    --accent: #35c5da;
+    --accent-hover: #5ad4e6;
+    --accent-soft: rgba(53, 197, 218, 0.12);
+    --accent-ring: rgba(53, 197, 218, 0.32);
+
+    --selection-stroke: #ff7a3d;
+    --selection-fill: rgba(255, 122, 61, 0.14);
+    --selection-glow: rgba(255, 122, 61, 0.45);
+
+    --status-ready-bg: rgba(53, 197, 218, 0.14);
+    --status-ready-fg: #7fdcea;
+    --status-planned-bg: rgba(255, 255, 255, 0.06);
+    --status-planned-fg: #99a3b0;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+}

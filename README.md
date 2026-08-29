@@ -1,0 +1,99 @@
+# One-Shot Takeoff
+
+Draw a box around a single symbol on a construction drawing; find every other instance of it.
+
+This repository is the **frontend, the document library, and the interfaces** for that system. The
+computer vision is not built yet - it is designed in **[FUTURE_WORK.md](FUTURE_WORK.md)**, and it
+plugs in behind one function.
+
+The target quantities are doors, detail markers, elevation markers and electrical receptacles, taken
+off a rasterized version of the drawing rather than its vector geometry.
+
+## Run it
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+Then open <http://localhost:5173>.
+
+## What is here
+
+**The home page** is a grid of square tiles, one per detection strategy, generated from
+`src/strategies/registry.ts`. Six describe planned approaches and link to a write-up. One works.
+
+**Test Strategy** (`/test`) is the exemplar picker, and the reason the rest of the plumbing exists:
+
+- Open any document from the library; PDFs and bitmaps behave identically.
+- Zoom (buttons, ctrl/⌘ + wheel at the cursor, fit-page, fit-width, 1:1), page through the set, pan
+  by dragging in Pan mode, holding space, or middle-dragging.
+- **Left-drag to draw a bounding box** around a symbol. The box stays locked to the drawing at any
+  zoom, and comes back when you leave the page and return.
+- The **exemplar chip** in the corner shows the captured region as the detector would receive it - a
+  300 DPI re-render, not a screen grab - with Copy JSON and Save PNG.
+
+## The database is a directory
+
+`data/` is the document store. A file is in the library when it is in that folder. See
+[data/README.md](data/README.md).
+
+`plugins/dataLibrary.ts` is a Vite plugin - not a separate backend - exposing two routes:
+
+| Route | Purpose |
+|---|---|
+| `GET /api/library` | Live `readdir` of `data/`. Drop a file in, hit Refresh, it is there. |
+| `GET /data/<name>` | The bytes, with HTTP `Range` support so pdf.js streams the 21 MB seed set instead of downloading it up front. |
+
+Those two routes are the whole contract between the UI and storage. Replacing them with a real
+service is a `server.proxy` entry and no changes under `src/`.
+
+## Two design decisions worth knowing
+
+**Selections are stored in normalized page coordinates**, never pixels - `{x0, y0, x1, y1}` in 0..1 of
+the page's intrinsic size. That is what lets a box survive zooming, resizing and page changes, and it
+is what lets the detection backend re-rasterize the same region at whatever DPI it wants.
+`src/lib/geometry.ts` is the only module that produces pixel rectangles, and they live for one paint.
+
+**The viewer rasterizes only the visible region**, not the whole page. At 800% zoom a full-page canvas
+for a 36x24 inch sheet would be 24,000 px wide; the visible region is never much larger than the
+window. Renders go to an offscreen canvas and are swapped in on completion, superseded renders are
+cancelled, and renders are serialized per page - pdf.js will not run two `render()` calls against the
+same page proxy at once, and the second one never resolves if you try.
+
+## Layout
+
+```
+data/                    the document library (contents gitignored)
+plugins/dataLibrary.ts   /api/library and /data/* as Vite middleware
+src/
+  api/detect.ts          runStrategy() - the single seam for all detection work
+  api/library.ts         the library client
+  lib/source.ts          RenderSource: paint any region of any page at any scale
+  lib/pdf.ts             pdf.js implementation
+  lib/raster.ts          bitmap implementation
+  lib/geometry.ts        normalized <-> pixel conversions
+  lib/crop.ts            300 DPI exemplar rendering
+  components/            viewer, toolbar, selection overlay, chip, file list
+  pages/                 home, strategy detail, test workspace
+  strategies/registry.ts the strategy catalogue - add a tile by adding an entry
+```
+
+## Adding a strategy
+
+1. Add an entry to `src/strategies/registry.ts`. The tile, the route and the detail page follow.
+2. Implement the backend behind `runStrategy()` in `src/api/detect.ts`.
+
+There is no step 3, and no UI to write.
+
+## Scripts
+
+| Command | Does |
+|---|---|
+| `npm run dev` | Dev server with the library routes on `:5173` |
+| `npm run build` | Typecheck, then production build |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run preview` | Serve the production build, library routes included |

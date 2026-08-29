@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+*.local
+.DS_Store
+
+# The document library is a data directory, not source. Keep the folder and its
+# README under version control; keep the (large) drawing files out.
+data/*
+!data/README.md
+!data/.gitkeep
