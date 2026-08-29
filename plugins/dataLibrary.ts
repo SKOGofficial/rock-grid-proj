@@ -10,7 +10,7 @@
  *     GET /data/<name>   -> the file bytes, with HTTP Range support
  *
  *   Range support is not optional. pdf.js issues partial requests so it can render page 1 of a
- *   215-page, 20 MB drawing set without downloading the whole thing first; without a 206 path
+ *   28-sheet, 21 MB drawing set without downloading the whole thing first; without a 206 path
  *   here, opening a document blocks on the full transfer.
  */
 

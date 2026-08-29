@@ -100,7 +100,7 @@ export const STRATEGIES: Strategy[] = [
     description:
       'Treat the sheet as a corpus: cut it into small overlapping patches, embed each one, and ' +
       'index them. The exemplar box becomes a query vector, and cosine similarity ranks candidate ' +
-      'locations. The retrieval framing pays off once the index is reused across a whole 215-page ' +
+      'locations. The retrieval framing pays off once the index is reused across a whole multi-sheet ' +
       'set - build it once, then answer any number of exemplar queries against it.',
     approach: [
       'Cut the rasterized page into overlapping patches with a stride well under symbol size.',

@@ -27,7 +27,7 @@ Anything else in this folder is ignored by the listing endpoint.
 
 ## Seed data
 
-`skanska-drawing-set.pdf` — 215 pages, ~21 MB, copied from `Skanksa (1).pdf`. This is the drawing
+`skanska-drawing-set.pdf` — 28 sheets, ~21 MB, copied from `Skanksa (1).pdf`. This is the drawing
 set the detection work targets: doors, detail markers, elevation markers, and electrical
 receptacles.
 

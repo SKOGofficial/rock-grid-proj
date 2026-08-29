@@ -3,7 +3,7 @@
  *
  * Summary:
  *   This page detects nothing. It exists to produce the one input every detection strategy needs
- *   - a clean exemplar - and to prove the plumbing around it works: streaming a 215-page drawing
+ *   - a clean exemplar - and to prove the plumbing around it works: streaming a multi-sheet drawing
  *   set, rasterizing a page, and holding a region selection that stays anchored to the drawing
  *   under any zoom.
  *

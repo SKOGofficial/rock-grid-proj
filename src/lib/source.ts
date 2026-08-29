@@ -58,7 +58,7 @@ export interface RenderSource {
    * Raises:
    *   Rejects if the page does not exist or the document is closed.
    * Summary:
-   *   Async because pdf.js loads pages lazily; forcing all 215 pages of a drawing set to load
+   *   Async because pdf.js loads pages lazily; forcing every page of a drawing set to load
    *   just to know how big they are would defeat range-request streaming.
    */
   getPageSize(page: number): Promise<PageSize>
