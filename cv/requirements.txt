@@ -1,0 +1,21 @@
+# Detection service dependencies. Python 3.12.
+#
+# Deliberately five packages. Every strategy in FUTURE_WORK.md beyond fft-ncc will want more
+# (scipy, hnswlib, torch); none of them are here yet, and none should be added until the strategy
+# that needs them is actually being written.
+
+# PDF page -> raster. Chosen over PyMuPDF specifically: PyMuPDF is AGPL v3, which for a
+# closed-source or internal commercial tool requires a paid Artifex licence. pypdfium2 wraps
+# Google's PDFium under BSD-3/Apache-2.0 and does exactly the one thing needed here.
+pypdfium2>=4.30,<6
+
+# Normalized cross-correlation (matchTemplate). "headless" omits the GUI/X11 libraries, which are
+# useless to a server and are the bulk of the package's size in a container.
+opencv-python-headless>=4.10,<5
+
+numpy>=2.1,<3
+
+fastapi>=0.115,<1
+# Plain uvicorn, not uvicorn[standard]: the extras exist for reload-watching and uvloop, neither of
+# which a request/response service needs.
+uvicorn>=0.32,<1
