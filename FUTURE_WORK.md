@@ -401,6 +401,34 @@ threshold is a *feature*, not an admission of failure.
 > template's 5.81%, close enough that the gate would need careful calibration rather than an
 > obvious cut.
 
+> **A second measurement, on the symbol class the knee was designed for.** Grid bubbles are the worst
+> case for it - each contains a different letter, so every instance is a partial match. Repeating the
+> test on sheet E4 (page 26) with a floor device - a boxed receptacle-and-data symbol, drawn
+> identically, no interior text - gives a very different result.
+>
+> The cliff is real: `... 0.767, 0.712, 0.700` then a drop to `0.541`, a gap of 0.159 against a next
+> largest of 0.055. Only 24 candidates clear the floor, against 100 for the bubble. **The knee's
+> premise holds when the instances really are near-duplicates**, so it should be kept, not discarded.
+>
+> It still gets the count wrong, but for a different and more interesting reason. It returns 21, all
+> of them genuine. The true count is 24: three more real devices score 0.541, 0.538 and 0.494,
+> because conduit stubs and homerun arrows drawn *through* the template window depress their
+> correlation. Occlusion by annotation - the risk named in section 4a - produces a **second
+> population** of true instances below the cliff.
+>
+> And the populations interleave. A genuine false positive (a triangle beside a wall line) scores
+> 0.525, sitting between the true instances at 0.538 and 0.494. So no single cutoff is right:
+>
+> | Cutoff | Found | Correct | False | Missed |
+> |---|---|---|---|---|
+> | 0.700 (the knee's) | 21 | 21 | 0 | 3 |
+> | 0.490 | 25 | 24 | 1 | 0 |
+>
+> That is a limitation of the *matcher*, not of the thresholding logic - no rule operating on this
+> score list can return exactly 24. It is an argument for masked correlation (§4a), which would stop
+> conduit crossing the window from costing score, and for reporting candidates below the cutoff so a
+> reviewer can see the boundary rather than being handed a number.
+
 **Non-maximum suppression.** Greedy, on intersection-over-union. Correlation peaks are broad; without
 this a single symbol reports as a dozen matches. *(Implemented in `cv/app/postprocess.py`. An earlier
 draft of this document proposed suppressing within half the template diagonal — that turned out to be
