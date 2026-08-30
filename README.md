@@ -89,6 +89,38 @@ src/
 
 There is no step 3, and no UI to write.
 
+## Tests
+
+The detection service has checks under `cv/tests/`. They need no pytest — plain asserts and a
+runner that reports every case by name rather than stopping at the first failure:
+
+```bash
+cv/.venv/Scripts/python -m cv.tests.test_postprocess
+```
+
+They are pytest-collectable too, if pytest is ever added.
+
+> [!IMPORTANT]
+> **These tests have not been independently reviewed.** They were written alongside the code they
+> check, by the same author, in the same sitting — so a misunderstanding baked into the
+> implementation is very likely baked into its test as well. A green run currently proves the code
+> matches its author's intent, not that the intent was right.
+>
+> Before relying on them, go through **each case individually** and decide for yourself whether
+> the expected answer is actually correct. Several encode real judgement calls rather than
+> obvious facts, and those are the ones to argue with first:
+>
+> - `test_diagonal_offset_both_survive` — asserts two boxes overlapping ~15% are two symbols.
+>   Is 0.3 the right IoU cutoff on real drawings, or does it split single detections?
+> - `test_threshold_keeps_uniformly_high_scores` — the virtual-floor behaviour. Correct for a
+>   sheet full of one symbol; check what it does when a sheet has *no* instances.
+> - `test_finalize_dense_sheet_survives_the_knee_cap` — 600 instances at one score is a friendly
+>   distribution. A real dense sheet has a spread, and the knee may land somewhere less obliging.
+> - `test_stacked_elongated_boxes_both_survive` — the numbers are a plausible door, not a
+>   measured one. Worth re-deriving from an actual door on a real sheet.
+>
+> Cases exercising empty input and truncation are mechanical and need less scrutiny.
+
 ## Scripts
 
 | Command | Does |
@@ -97,3 +129,4 @@ There is no step 3, and no UI to write.
 | `npm run build` | Typecheck, then production build |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run preview` | Serve the production build, library routes included |
+| `python -m cv.tests.test_postprocess` | Detection-service checks (see the caveat above) |
