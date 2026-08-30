@@ -103,12 +103,17 @@ def test_threshold_single_instance() -> None:
 
 
 def test_threshold_nothing_above_floor() -> None:
-    """A sheet with no instances must not have a cliff found inside its noise."""
-    assert choose_threshold([0.2, 0.1]) == 0.5
+    """
+    A sheet with no instances must not have a cliff found inside its noise.
+
+    The floor is passed explicitly rather than relying on the module default, so that tuning the
+    default cannot silently change what this case is asserting.
+    """
+    assert choose_threshold([0.2, 0.1], floor=0.5) == 0.5
 
 
 def test_threshold_empty() -> None:
-    assert choose_threshold([]) == 0.5
+    assert choose_threshold([], floor=0.5) == 0.5
 
 
 # --------------------------------------------------------------------------------------------

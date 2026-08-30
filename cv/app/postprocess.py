@@ -31,7 +31,13 @@ import numpy as np
 #:
 #: Without a hard floor the knee search below will happily find a cliff inside pure noise and
 #: report matches on a sheet that contains none.
-DEFAULT_FLOOR = 0.5
+#:
+#: This was 0.5 until measurement showed that was already discarding true instances. Searching for
+#: a floor device on sheet E4, three genuine matches scored 0.541, 0.538 and 0.494 - depressed by
+#: conduit stubs drawn through the template window - so the last was cut before anything downstream
+#: could weigh it. The floor is meant to bound absurdity, not to decide the answer; 0.35 leaves the
+#: judgement to the threshold, where a reviewer can see and move it.
+DEFAULT_FLOOR = 0.35
 
 #: Intersection-over-union above which two boxes are treated as the same detection.
 #:
