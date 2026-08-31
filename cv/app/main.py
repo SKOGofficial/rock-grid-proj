@@ -25,11 +25,14 @@ Summary:
 
 from __future__ import annotations
 
+import base64
 import os
 import time
 from pathlib import Path
 from typing import Literal
 
+import cv2
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
@@ -93,6 +96,9 @@ class DetectOptions(ApiModel):
     rotations: list[int] = Field(default_factory=lambda: list(DEFAULT_ROTATIONS))
     mirror: bool = False
     max_matches: int = Field(default=MAX_MATCHES, ge=1, le=20_000)
+    #: Return the correlation response map too. Off by default - it costs a page-sized float32
+    #: accumulation and a PNG encode, and most runs do not want it.
+    include_heatmap: bool = False
 
     @field_validator("rotations")
     @classmethod
@@ -155,6 +161,9 @@ class DetectResponse(ApiModel):
     page_height: int
     #: The DPI actually rendered at, which may be below the DPI requested for a very large sheet.
     dpi: float
+    #: Grayscale response map as a PNG data URL, when `includeHeatmap` was set. Page-sized and
+    #: centre-aligned, so the UI overlays it at the origin with no offset arithmetic.
+    heatmap_png: str | None = None
 
 
 def resolve_document(file_name: str) -> Path:
@@ -196,6 +205,30 @@ def resolve_document(file_name: str) -> Path:
     if not resolved.is_file():
         raise not_found
     return resolved
+
+
+def _encode_heatmap(heatmap: np.ndarray | None) -> str | None:
+    """
+    Turn a downsampled response map into a data URL.
+
+    Parameters:
+        heatmap: uint8 array from the matcher, or None.
+    Returns:
+        A `data:image/png;base64,...` string, or None.
+    Raises:
+        Nothing; an encode failure yields None rather than failing the detection.
+    Summary:
+        Single-channel grayscale on purpose. Colour-mapping it here would freeze the palette and,
+        worse, freeze any threshold contour at whatever the cutoff happened to be when it was
+        generated. Sending the raw scores lets the UI redraw that contour as a slider moves,
+        without asking for a new map.
+    """
+    if heatmap is None:
+        return None
+    ok, buffer = cv2.imencode(".png", heatmap)
+    if not ok:
+        return None
+    return "data:image/png;base64," + base64.b64encode(buffer.tobytes()).decode("ascii")
 
 
 @app.post("/api/detect", response_model=DetectResponse)
@@ -248,6 +281,7 @@ def detect(request: DetectRequest) -> DetectResponse:
             floor=options.floor,
             iou_threshold=options.iou_threshold,
             max_matches=options.max_matches,
+            include_heatmap=options.include_heatmap,
         )
     except ValueError as error:
         # A selection too small to correlate, or a page that does not exist. Both are things the
@@ -289,4 +323,5 @@ def detect(request: DetectRequest) -> DetectResponse:
         page_width=width,
         page_height=height,
         dpi=result.dpi,
+        heatmap_png=_encode_heatmap(result.heatmap),
     )

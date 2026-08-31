@@ -2,29 +2,34 @@
 
 Draw a box around a single symbol on a construction drawing; find every other instance of it.
 
-This repository is the **frontend, the document library, and the interfaces** for that system. The
-computer vision is not built yet - it is designed in **[FUTURE_WORK.md](FUTURE_WORK.md)**, and it
-plugs in behind one function.
+One strategy is implemented end to end: **FFT cross-correlation**, in [cv/](cv/README.md). The other
+five are designed in **[FUTURE_WORK.md](FUTURE_WORK.md)** and plug in behind the same function.
 
 The target quantities are doors, detail markers, elevation markers and electrical receptacles, taken
 off a rasterized version of the drawing rather than its vector geometry.
 
 ## Run it
 
-```bash
-npm install
-```
+Two processes, in two terminals. The frontend alone will start and browse drawings; detection needs
+the service as well.
 
 ```bash
+npm install
 npm run dev
 ```
 
-Then open <http://localhost:5173>.
+```bash
+npm run cv
+```
+
+Then open <http://localhost:5173>. The second command needs a Python virtualenv first - see
+[cv/README.md](cv/README.md). Without it running, everything works except Find matches, which says
+so plainly rather than failing obscurely.
 
 ## What is here
 
 **The home page** is a grid of square tiles, one per detection strategy, generated from
-`src/strategies/registry.ts`. Six describe planned approaches and link to a write-up. One works.
+`src/strategies/registry.ts`. Adding a strategy is one entry in that array.
 
 **Test Strategy** (`/test`) is the exemplar picker, and the reason the rest of the plumbing exists:
 
@@ -35,6 +40,15 @@ Then open <http://localhost:5173>.
   zoom, and comes back when you leave the page and return.
 - The **exemplar chip** in the corner shows the captured region as the detector would receive it - a
   300 DPI re-render, not a screen grab - with Copy JSON and Save PNG.
+- **Find matches** runs the detector. Results appear as green boxes, with near misses dashed, and a
+  slider moves the cutoff and re-counts instantly - no second request. Optionally the correlation
+  response map overlays the drawing, so a symbol that produced *no* signal looks different from one
+  that scored just under the line.
+
+> [!NOTE]
+> **The automatic cutoff is not trustworthy yet.** Measured on the seed set it returns 21 where the
+> answer is 24, and on grid bubbles 75 where the answer is 8. That is why the slider exists and why
+> the reply carries candidates on both sides of the line. FUTURE_WORK §7 has the measurements.
 
 ## The database is a directory
 
@@ -80,14 +94,16 @@ src/
   components/            viewer, toolbar, selection overlay, chip, file list
   pages/                 home, strategy detail, test workspace
   strategies/registry.ts the strategy catalogue - add a tile by adding an entry
+cv/                      the detection service (Python) - see cv/README.md
 ```
 
 ## Adding a strategy
 
 1. Add an entry to `src/strategies/registry.ts`. The tile, the route and the detail page follow.
-2. Implement the backend behind `runStrategy()` in `src/api/detect.ts`.
+2. Add it to `IMPLEMENTED_STRATEGIES` in `cv/app/main.py` and dispatch to your matcher.
 
-There is no step 3, and no UI to write.
+There is no step 3, and no UI to write. `runStrategy()` in `src/api/detect.ts` is already the single
+call site; unimplemented ids answer 501 and surface as `NotImplementedError`.
 
 ## Tests
 
@@ -129,4 +145,5 @@ They are pytest-collectable too, if pytest is ever added.
 | `npm run build` | Typecheck, then production build |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run preview` | Serve the production build, library routes included |
+| `npm run cv` | Detection service on `:8000` (needs the venv - see [cv/README.md](cv/README.md)) |
 | `python -m cv.tests.test_postprocess` | Detection-service checks (see the caveat above) |

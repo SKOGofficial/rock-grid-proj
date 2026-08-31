@@ -93,7 +93,10 @@ export function StrategyPage() {
       <div className="detail__runbar">
         <p>
           {strategy.status === 'ready' ? (
-            <>Open the workspace to draw an exemplar on any sheet in the library.</>
+            <>
+              Draw an exemplar in the workspace, then run this strategy against it. The detection
+              service must be running - see <code>cv/README.md</code>.
+            </>
           ) : (
             <>
               No implementation yet. When one exists it plugs into{' '}
@@ -103,7 +106,7 @@ export function StrategyPage() {
           )}
         </p>
         {strategy.status === 'ready' ? (
-          <Link to={strategy.href} className="button button--primary">
+          <Link to="/test" className="button button--primary">
             Open workspace
           </Link>
         ) : (

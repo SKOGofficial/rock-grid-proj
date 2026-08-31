@@ -71,6 +71,13 @@ class NormRect(NamedTuple):
     y1: float
 
 
+#: Longest edge of the heatmap handed back, in pixels.
+#:
+#: The raw response map is page-sized float32 - about 78 MB - which has no business on a wire. The
+#: diagnostic value is in the spatial pattern, not the precision.
+HEATMAP_MAX_EDGE = 1400
+
+
 class MatchResult(NamedTuple):
     """Everything the HTTP layer needs to build a response."""
 
@@ -82,6 +89,44 @@ class MatchResult(NamedTuple):
     template_size: tuple[int, int]
     orientations_searched: int
     elapsed_ms: float
+    #: Downsampled response map as uint8, or None. Encoding it is the HTTP layer's business.
+    heatmap: np.ndarray | None = None
+
+
+def _downsample_heatmap(heat: np.ndarray, max_edge: int = HEATMAP_MAX_EDGE) -> np.ndarray:
+    """
+    Reduce a response map to something transmittable, without losing its peaks.
+
+    Parameters:
+        heat: page-sized float32 response map.
+        max_edge: longest edge of the result.
+    Returns:
+        A uint8 array, scores clamped to 0..1 and scaled to 0..255.
+    Raises:
+        Nothing.
+    Summary:
+        Max-pools before resizing. This is the whole difficulty: `INTER_AREA` *averages*, so a
+        genuine three-pixel peak surrounded by background is averaged into the background and
+        vanishes - producing a map that shows the broad structure and loses precisely the thing it
+        was requested for. Dilating by the reduction factor first makes each output pixel the
+        maximum of the block it covers.
+
+        Negative correlation is clamped away; `TM_CCOEFF_NORMED` ranges -1..1 and nothing below
+        zero is of interest here.
+    """
+    height, width = heat.shape
+    factor = max(1, int(np.ceil(max(height, width) / max_edge)))
+
+    if factor > 1:
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (factor * 2 + 1, factor * 2 + 1))
+        heat = cv2.dilate(heat, kernel)
+        heat = cv2.resize(
+            heat,
+            (max(1, width // factor), max(1, height // factor)),
+            interpolation=cv2.INTER_NEAREST,
+        )
+
+    return (np.clip(heat, 0.0, 1.0) * 255.0).astype(np.uint8)
 
 
 def _oriented_templates(
@@ -160,6 +205,7 @@ def find_matches(
     floor: float = DEFAULT_FLOOR,
     iou_threshold: float = DEFAULT_IOU,
     max_matches: int = MAX_MATCHES,
+    include_heatmap: bool = False,
 ) -> MatchResult:
     """
     Find every instance of the exemplar on one page.
@@ -214,6 +260,9 @@ def find_matches(
     candidates: list[Candidate] = []
     bank = _oriented_templates(template, rotations, mirror)
 
+    # Accumulated only when asked for; it is another page-sized float32 alongside the response map.
+    heat = np.zeros((page_height, page_width), dtype=np.float32) if include_heatmap else None
+
     for degrees, mirrored, oriented in bank:
         oriented_height, oriented_width = oriented.shape
         if oriented_width > page_width or oriented_height > page_height:
@@ -222,6 +271,19 @@ def find_matches(
         # One orientation at a time. The response map is roughly the size of the page in float32 -
         # about 71 MB for a D-size sheet - so holding all four at once would be gratuitous.
         response = cv2.matchTemplate(image, oriented, cv2.TM_CCOEFF_NORMED)
+
+        if heat is not None:
+            # Each orientation's map is a different size - a 90-degree template swaps width and
+            # height - so they cannot simply be maximised together. Scattering each at its *centre*
+            # offset solves that and the alignment problem at once: matchTemplate scores the
+            # template's top-left corner, so a map accumulated in that frame would need shifting by
+            # half a symbol before it could be overlaid. Placing scores at centres up front makes
+            # the result page-aligned, and makes that off-by-half-a-symbol bug unrepresentable.
+            offset_y, offset_x = oriented_height // 2, oriented_width // 2
+            rows, columns = response.shape
+            window = heat[offset_y : offset_y + rows, offset_x : offset_x + columns]
+            np.maximum(window, response, out=window)
+
         found = _peaks(response, floor, oriented_width, oriented_height)
         del response
 
@@ -256,4 +318,5 @@ def find_matches(
         template_size=(template_width, template_height),
         orientations_searched=len(bank),
         elapsed_ms=(time.perf_counter() - started) * 1000.0,
+        heatmap=None if heat is None else _downsample_heatmap(heat),
     )

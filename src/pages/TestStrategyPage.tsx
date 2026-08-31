@@ -15,12 +15,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { DocumentCanvas, type ViewerMode } from '../components/DocumentCanvas'
 import { FileList } from '../components/FileList'
+import { ResultsPanel } from '../components/ResultsPanel'
 import { SelectionChip } from '../components/SelectionChip'
 import { ViewerToolbar } from '../components/ViewerToolbar'
+import { buildDetectRequest, runStrategy } from '../api/detect'
 import { createSelection } from '../lib/crop'
 import { clamp } from '../lib/geometry'
 import { openDocument, type RenderSource } from '../lib/source'
-import type { LibraryFile, NormRect, PageSize, Selection } from '../types'
+import type { DetectResponse, LibraryFile, NormRect, PageSize, Selection } from '../types'
+
+/** The only strategy with a backend today. */
+const STRATEGY_ID = 'fft-ncc'
 
 const MIN_ZOOM = 0.05
 const MAX_ZOOM = 12
@@ -63,8 +68,18 @@ export function TestStrategyPage() {
    * later when the fit lands.
    */
   const [pendingFit, setPendingFit] = useState<'page' | 'width' | null>(null)
+  const [detection, setDetection] = useState<DetectResponse | null>(null)
+  const [detecting, setDetecting] = useState(false)
+  const [detectError, setDetectError] = useState<string | null>(null)
+  /** The user's cutoff override. Null means "use whatever the service suggested". */
+  const [thresholdOverride, setThresholdOverride] = useState<number | null>(null)
+  const [showNearMisses, setShowNearMisses] = useState(true)
+  const [showHeatmap, setShowHeatmap] = useState(false)
+
   /** Guards against an out-of-order crop resolving after a newer one. */
   const selectionTokenRef = useRef(0)
+  /** Cancels a detection run superseded by a newer one, or by leaving the page. */
+  const detectAbortRef = useRef<AbortController | null>(null)
 
   /* -------------------------------------------------------------------------------------- *
    * Document lifecycle
@@ -168,6 +183,64 @@ export function TestStrategyPage() {
   }, [])
 
   /* -------------------------------------------------------------------------------------- *
+   * Detection
+   * -------------------------------------------------------------------------------------- */
+
+  const clearDetection = useCallback(() => {
+    detectAbortRef.current?.abort()
+    detectAbortRef.current = null
+    setDetection(null)
+    setDetectError(null)
+    setThresholdOverride(null)
+    setDetecting(false)
+  }, [])
+
+  const runDetection = useCallback(
+    (withHeatmap: boolean, keepThreshold = false) => {
+      if (!selection) return
+      // A superseded run must not land after a newer one and overwrite it.
+      detectAbortRef.current?.abort()
+      const controller = new AbortController()
+      detectAbortRef.current = controller
+
+      setDetecting(true)
+      setDetectError(null)
+
+      const request = buildDetectRequest(STRATEGY_ID, selection)
+      if (withHeatmap) request.options = { includeHeatmap: true }
+
+      runStrategy(request, controller.signal)
+        .then((response) => {
+          if (controller.signal.aborted) return
+          setDetection(response)
+          // A run triggered only to fetch the response map must not throw away a cutoff the user
+          // has already chosen - toggling a view should not silently change the count.
+          if (!keepThreshold) setThresholdOverride(null)
+        })
+        .catch((cause: unknown) => {
+          if (controller.signal.aborted) return
+          setDetectError(cause instanceof Error ? cause.message : String(cause))
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setDetecting(false)
+        })
+    },
+    [selection],
+  )
+
+  /**
+   * The response map is opt-in, so turning it on for an existing result needs a fresh run.
+   * Turning it off is free - the map is already in hand and simply stops being drawn.
+   */
+  const handleToggleHeatmap = useCallback(() => {
+    const next = !showHeatmap
+    setShowHeatmap(next)
+    if (next && detection && !detection.heatmapPng) runDetection(true, true)
+  }, [detection, runDetection, showHeatmap])
+
+  useEffect(() => () => detectAbortRef.current?.abort(), [])
+
+  /* -------------------------------------------------------------------------------------- *
    * Selection
    * -------------------------------------------------------------------------------------- */
 
@@ -175,6 +248,8 @@ export function TestStrategyPage() {
     (rect: NormRect) => {
       if (!source || !activeFile) return
       const token = ++selectionTokenRef.current
+      // Results describe the previous template, so they cannot outlive it.
+      clearDetection()
       createSelection(source, activeFile.name, page, rect)
         .then((next) => {
           // Drop the result if the user has already drawn again or changed documents.
@@ -184,22 +259,24 @@ export function TestStrategyPage() {
           if (token === selectionTokenRef.current) setSelection(null)
         })
     },
-    [activeFile, page, source],
+    [activeFile, clearDetection, page, source],
   )
 
   const handleClearSelection = useCallback(() => {
     selectionTokenRef.current += 1
     setSelection(null)
-  }, [])
+    clearDetection()
+  }, [clearDetection])
 
   const handleSelectFile = useCallback(
     (file: LibraryFile) => {
       if (file.name === activeFile?.name) return
       selectionTokenRef.current += 1
       setSelection(null)
+      clearDetection()
       setActiveFile(file)
     },
-    [activeFile],
+    [activeFile, clearDetection],
   )
 
   const handlePageChange = useCallback(
@@ -214,6 +291,12 @@ export function TestStrategyPage() {
    * Render
    * -------------------------------------------------------------------------------------- */
 
+  // The cutoff in force: the user's, or the service's suggestion until they move it.
+  const effectiveThreshold = thresholdOverride ?? detection?.thresholdUsed ?? 0
+  // Detection is single-page, so matches only render on the page they were found on - the same
+  // rule the exemplar box already follows.
+  const pageMatches = detection?.matches.filter((match) => match.page === page)
+
   const ready = loadState === 'ready' && Boolean(pageSize)
   const status =
     loadState === 'error'
@@ -226,7 +309,7 @@ export function TestStrategyPage() {
 
   return (
     <main className="workspace">
-      <section className="viewer">
+      <section className={'viewer' + (detection ? ' viewer--has-results' : '')}>
         <ViewerToolbar
           fileName={activeFile?.name ?? null}
           zoom={zoom}
@@ -260,9 +343,37 @@ export function TestStrategyPage() {
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
           suspended={pendingFit !== null}
+          matches={pageMatches}
+          matchThreshold={effectiveThreshold}
+          showNearMisses={showNearMisses}
+          heatmapPng={showHeatmap ? (detection?.heatmapPng ?? null) : null}
+          heatmapFloor={detection?.floorUsed ?? 0}
         />
 
-        {selection && <SelectionChip selection={selection} onClear={handleClearSelection} />}
+        {selection && (
+          <SelectionChip
+            selection={selection}
+            onClear={handleClearSelection}
+            onDetect={() => runDetection(showHeatmap)}
+            detecting={detecting}
+            error={detectError}
+          />
+        )}
+
+        {detection && (
+          <ResultsPanel
+            detection={detection}
+            threshold={effectiveThreshold}
+            onThresholdChange={setThresholdOverride}
+            onResetThreshold={() => setThresholdOverride(null)}
+            showNearMisses={showNearMisses}
+            onToggleNearMisses={() => setShowNearMisses((value) => !value)}
+            showHeatmap={showHeatmap}
+            onToggleHeatmap={handleToggleHeatmap}
+            heatmapPending={detecting}
+            onClear={clearDetection}
+          />
+        )}
       </section>
 
       <FileList activeFileName={activeFile?.name ?? null} onSelectFile={handleSelectFile} />
