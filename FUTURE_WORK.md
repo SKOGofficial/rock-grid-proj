@@ -361,6 +361,29 @@ Validate the oracle itself against a small hand-checked sample first - block ext
 failure modes (exploded blocks, symbols drawn as raw geometry). But the leverage here is larger than
 any algorithmic choice in this document.
 
+> **Measured, and the premise fails outright.** `skanska-drawing-set.pdf` page 4 has four named
+> XObjects in its resources, all `/Subtype /Image`, and exactly two `Do` invocations in the whole
+> content stream - a raster image drawn twice, not a symbol. Confirmed two ways: pypdfium2's page
+> object API (which resolves Form XObjects transparently) returns zero objects of type `FORM` out
+> of 29,284 on that page; walking the raw content stream with pdfminer.six's low-level parser finds
+> the same thing from the other direction. **There are no block instances in this file's vector
+> layer.** Every stroke and glyph that draws a receptacle, marker or door is inlined directly into
+> the page content stream. This is not the partial risk the paragraph above hedged against - it is
+> this file's actual structure, and there is no reason to expect the other 27 sheets differ, since
+> they come from the same export pipeline.
+>
+> "Extract them with PyMuPDF or pdfplumber" therefore does not apply - there is nothing shaped like
+> a block to extract. What survives is the geometry itself: pdfminer.six's layout analysis resolves
+> every stroked/filled primitive and text glyph to a bounding box in final page space regardless of
+> how it got there, with the full transform stack already applied. Clustering those primitives by
+> spatial adjacency is connected-component labelling on exact vector geometry instead of a
+> rasterized, threshold-dependent bitmap - the vector counterpart of Strategy 4b, and strictly more
+> precise than its raster form because there is no binarization step to get wrong. It is a weaker
+> oracle than a true block enumeration would have been (it recovers *a* box per symbol, not a
+> *class label* - two different symbol types of similar size and shape are indistinguishable until
+> compared against an exemplar), but it still delivers the same three uses listed above, and it is
+> what this file actually permits. Implementation: `cv/app/vector_oracle.py`.
+
 ---
 
 ## 7. The shared verification layer
