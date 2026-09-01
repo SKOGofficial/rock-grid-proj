@@ -38,6 +38,13 @@
   --selection-fill: rgba(255, 92, 31, 0.12);
   --selection-glow: rgba(255, 92, 31, 0.4);
 
+  /* Detected instances. Green so it cannot be confused with the orange exemplar box or with the
+     black-on-white linework underneath. The weak variant marks candidates that scored something
+     but fell below the cutoff - the near misses. */
+  --match-stroke: #12a150;
+  --match-fill: rgba(18, 161, 80, 0.1);
+  --match-stroke-weak: rgba(18, 161, 80, 0.5);
+
   --status-ready-bg: rgba(13, 125, 143, 0.12);
   --status-ready-fg: #0a6373;
   --status-planned-bg: rgba(20, 23, 28, 0.06);
@@ -82,6 +89,10 @@
     --selection-stroke: #ff7a3d;
     --selection-fill: rgba(255, 122, 61, 0.14);
     --selection-glow: rgba(255, 122, 61, 0.45);
+
+    --match-stroke: #2fd47c;
+    --match-fill: rgba(47, 212, 124, 0.12);
+    --match-stroke-weak: rgba(47, 212, 124, 0.5);
 
     --status-ready-bg: rgba(53, 197, 218, 0.14);
     --status-ready-fg: #7fdcea;

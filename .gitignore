@@ -1,11 +1,25 @@
+# ---- Node / frontend ----
 node_modules/
 dist/
 .vite/
-*.local
-.DS_Store
 
-# The document library is a data directory, not source. Keep the folder and its
-# README under version control; keep the (large) drawing files out.
+# ---- Detection service (Python) ----
+# The venv is ~3,200 files of platform-specific binaries. It is rebuilt from
+# cv/requirements.txt, never committed.
+cv/.venv/
+__pycache__/
+*.py[cod]
+
+# ---- Local and OS cruft ----
+*.local
+.env
+.DS_Store
+Thumbs.db
+
+# ---- The document library ----
+# A data directory, not source. Keep the folder and its README under version
+# control; keep the drawing files themselves out - they are large binaries and,
+# in a real deployment, customer documents.
 data/*
 !data/README.md
 !data/.gitkeep

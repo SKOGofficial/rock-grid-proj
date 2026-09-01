@@ -16,6 +16,11 @@ import type { Selection } from '../types'
 interface SelectionChipProps {
   selection: Selection
   onClear: () => void
+  /** Run detection against this exemplar. */
+  onDetect: () => void
+  detecting: boolean
+  /** Message from a failed run, shown inline. */
+  error: string | null
 }
 
 /**
@@ -31,7 +36,13 @@ interface SelectionChipProps {
  *   Copy JSON emits the `Selection` object verbatim - the same shape the detection backend will
  *   receive - so a prototype can be developed against a real query before any of this is wired up.
  */
-export function SelectionChip({ selection, onClear }: SelectionChipProps) {
+export function SelectionChip({
+  selection,
+  onClear,
+  onDetect,
+  detecting,
+  error,
+}: SelectionChipProps) {
   const [copied, setCopied] = useState<'idle' | 'done' | 'failed'>('idle')
   const { rect } = selection
 
@@ -108,6 +119,17 @@ export function SelectionChip({ selection, onClear }: SelectionChipProps) {
           Save PNG
         </button>
       </div>
+
+      <button
+        type="button"
+        className="selection-chip__detect"
+        onClick={onDetect}
+        disabled={detecting}
+      >
+        {detecting ? 'Searching...' : 'Find matches'}
+      </button>
+
+      {error && <p className="selection-chip__error">{error}</p>}
     </div>
   )
 }

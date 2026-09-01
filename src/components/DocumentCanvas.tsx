@@ -15,9 +15,11 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import type { NormRect, PageSize } from '../types'
+import type { DetectMatch, NormRect, PageSize } from '../types'
 import { clamp } from '../lib/geometry'
 import type { RenderSource } from '../lib/source'
+import { HeatmapOverlay } from './HeatmapOverlay'
+import { MatchOverlay } from './MatchOverlay'
 import { SelectionOverlay } from './SelectionOverlay'
 
 /** Padding between the stage and the viewport edge, in CSS pixels. Mirrors `.viewer__scroll`. */
@@ -73,6 +75,15 @@ interface DocumentCanvasProps {
   maxZoom: number
   /** Hold off rendering - set while a freshly opened document is still waiting for its initial fit. */
   suspended?: boolean
+  /** Detected instances for the page on screen. Filtering by page is the caller's job. */
+  matches?: DetectMatch[]
+  /** Scores at or above this are counted; below it they are near misses. */
+  matchThreshold?: number
+  showNearMisses?: boolean
+  /** Response map as a PNG data URL, when the heatmap is being shown. */
+  heatmapPng?: string | null
+  /** Lower bound of the response map's alpha ramp. */
+  heatmapFloor?: number
 }
 
 /**
@@ -175,6 +186,11 @@ export function DocumentCanvas({
   minZoom,
   maxZoom,
   suspended = false,
+  matches,
+  matchThreshold = 0,
+  showNearMisses = true,
+  heatmapPng = null,
+  heatmapFloor = 0,
 }: DocumentCanvasProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -461,6 +477,22 @@ export function DocumentCanvas({
           style={{ width: `${stageWidth}px`, height: `${stageHeight}px` }}
         >
           <canvas ref={canvasRef} className="page-stage__canvas" style={{ visibility: 'hidden' }} />
+          {heatmapPng && (
+            <HeatmapOverlay
+              pngDataUrl={heatmapPng}
+              threshold={matchThreshold}
+              floor={heatmapFloor}
+            />
+          )}
+          {matches && matches.length > 0 && (
+            <MatchOverlay
+              stageWidth={stageWidth}
+              stageHeight={stageHeight}
+              matches={matches}
+              threshold={matchThreshold}
+              showNearMisses={showNearMisses}
+            />
+          )}
           <SelectionOverlay
             stageWidth={stageWidth}
             stageHeight={stageHeight}

@@ -730,6 +730,208 @@ a {
   white-space: nowrap;
 }
 
+/* Detected instances */
+
+.match-layer {
+  position: absolute;
+  inset: 0;
+  /* Below the selection layer, so a new exemplar can be drawn straight over a set of results. */
+  pointer-events: none;
+}
+
+.match-box {
+  position: absolute;
+  border: 2px solid var(--match-stroke);
+  background: var(--match-fill);
+  border-radius: 2px;
+}
+
+.match-box--near {
+  border: 1.5px dashed var(--match-stroke-weak);
+  background: transparent;
+}
+
+/* Heatmap */
+
+.heatmap-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* The map is page-sized and centre-aligned by construction, so it covers the stage exactly. */
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-color-scheme: dark) {
+  .heatmap-layer {
+    /* `multiply` disappears against a dark ground; the page itself is white either way, but the
+       blend mode is chosen for how the composite reads rather than for the paper. */
+    mix-blend-mode: normal;
+    opacity: 0.85;
+  }
+}
+
+/* Results panel - stacks above the exemplar chip in the same corner */
+
+.results-panel {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 6;
+  width: 236px;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+  animation: chip-in 0.18s var(--ease);
+}
+
+/* When results are showing, the exemplar chip moves up to sit above them. */
+.viewer--has-results .selection-chip {
+  bottom: 286px;
+}
+
+.results-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.results-panel__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--match-stroke);
+}
+
+.results-panel__count {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.results-panel__count strong {
+  font-size: 30px;
+  font-weight: 640;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.results-panel__count span {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+.results-panel__warning {
+  margin-bottom: 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--selection-stroke);
+}
+
+.results-panel__slider {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.results-panel__slider > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.results-panel__slider b {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.results-panel__slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--match-stroke);
+}
+
+.results-panel__reset {
+  border: none;
+  background: var(--surface-sunken);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.results-panel__reset:hover {
+  color: var(--text-primary);
+}
+
+.results-panel__toggles {
+  margin-top: 10px;
+  display: grid;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.results-panel__toggles label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.results-panel__toggles input {
+  accent-color: var(--match-stroke);
+}
+
+.results-panel__meta {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.selection-chip__detect {
+  width: 100%;
+  margin-top: 10px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--match-stroke);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.selection-chip__detect:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.selection-chip__detect:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.selection-chip__error {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--selection-stroke);
+}
+
 /* Hovering selection chip */
 
 .selection-chip {

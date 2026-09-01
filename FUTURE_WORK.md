@@ -374,14 +374,110 @@ between true instances and background. Find the knee - the largest relative drop
 scores - report the count there, and expose a slider around it. The user re-counting by dragging a
 threshold is a *feature*, not an admission of failure.
 
-**Non-maximum suppression.** Greedy, suppressing within roughly half the template diagonal. Correlation
-peaks are broad; without this a single symbol reports as a dozen matches.
+> **Measured, and the knee does not work yet.** Running `fft-ncc` against the grid bubbles on page 4
+> of the seed set, the correct answer is 8 (bubbles A-H) and an explicit cutoff of 0.85 returns
+> exactly those 8 with no false positives. The automatic knee returns **75**.
+>
+> The premise above is what fails. The real distribution is not a cliff, it is a smooth ramp:
+> `1.000, 0.963, 0.954, 0.931, 0.931, 0.914, 0.893, 0.872, 0.849, 0.849 ...` continuing down to 0.683
+> with no gap wider than 0.072 anywhere in it. The knee picks the largest gap, which lands at index
+> 74 rather than at the real boundary near index 8.
+>
+> Worse, the answer depends on an implementation detail. Searching one orientation yields 100
+> candidates and a cutoff of 0.683; searching four yields 298 candidates - with an *identical* top
+> twelve - and the extra low scorers fill in the gaps, moving the cutoff to 1.000 and the count to 1.
+> A method whose answer changes with the size of the rotation bank is not measuring the drawing.
+>
+> Two things are needed before this can be fixed rather than tuned blind: the **response-map overlay**
+> below, to see whether a miss is a missing peak or a bad cutoff; and **ground truth from the vector
+> layer** (§4e), so a candidate threshold rule can be scored instead of eyeballed. Until then
+> `options.threshold` is the reliable path, and 0.85 is a reasonable starting point for this symbol
+> class at 150 DPI.
+>
+> Candidate replacements worth trying against that ground truth: Otsu's method on the score
+> distribution, which is built for splitting two populations and is far less sensitive to how many
+> samples sit in the tail; and gating candidates on the ink coverage of the page region beneath them.
+> Note the second is weaker than it sounds here - the false positives measured 2.25% ink against the
+> template's 5.81%, close enough that the gate would need careful calibration rather than an
+> obvious cut.
+
+> **A second measurement, on the symbol class the knee was designed for.** Grid bubbles are the worst
+> case for it - each contains a different letter, so every instance is a partial match. Repeating the
+> test on sheet E4 (page 26) with a floor device - a boxed receptacle-and-data symbol, drawn
+> identically, no interior text - gives a very different result.
+>
+> The cliff is real: `... 0.767, 0.712, 0.700` then a drop to `0.541`, a gap of 0.159 against a next
+> largest of 0.055. Only 24 candidates clear the floor, against 100 for the bubble. **The knee's
+> premise holds when the instances really are near-duplicates**, so it should be kept, not discarded.
+>
+> It still gets the count wrong, but for a different and more interesting reason. It returns 21, all
+> of them genuine. The true count is 24: three more real devices score 0.541, 0.538 and 0.494,
+> because conduit stubs and homerun arrows drawn *through* the template window depress their
+> correlation. Occlusion by annotation - the risk named in section 4a - produces a **second
+> population** of true instances below the cliff.
+>
+> And the populations interleave. A genuine false positive (a triangle beside a wall line) scores
+> 0.525, sitting between the true instances at 0.538 and 0.494. So no single cutoff is right:
+>
+> | Cutoff | Found | Correct | False | Missed |
+> |---|---|---|---|---|
+> | 0.700 (the knee's) | 21 | 21 | 0 | 3 |
+> | 0.490 | 25 | 24 | 1 | 0 |
+>
+> That is a limitation of the *matcher*, not of the thresholding logic - no rule operating on this
+> score list can return exactly 24. It is an argument for masked correlation (§4a), which would stop
+> conduit crossing the window from costing score, and for reporting candidates below the cutoff so a
+> reviewer can see the boundary rather than being handed a number.
+
+**Non-maximum suppression.** Greedy, on intersection-over-union. Correlation peaks are broad; without
+this a single symbol reports as a dozen matches. *(Implemented in `cv/app/postprocess.py`. An earlier
+draft of this document proposed suppressing within half the template diagonal — that turned out to be
+wrong twice over. It over-suppresses diagonal neighbours: two boxes offset by 0.49 of the template in
+both axes overlap by only 15%, plainly two symbols, yet a per-axis distance rule merges them. And
+distance is only equivalent to IoU while every box is the same size, which stops being true both for
+rotated templates — a 250x80 door becomes 80x250 — and for the connected-component strategy, whose
+candidates vary in size by nature.)*
 
 **Rotation deduplication.** A 4-fold symmetric symbol fires at all four rotations in the same place.
-Deduplicate across the bank before counting, keeping the highest-scoring orientation.
+This needs no separate step: merge every orientation's peaks into one list *before* suppression and
+IoU collapses them, keeping the highest-scoring angle.
 
 **Reporting.** Return boxes in normalized page coordinates so the frontend can overlay them in the
 same space the exemplar was drawn in.
+
+### Show the response map
+
+**Not built. Worth building early — probably before tuning anything.**
+
+Every strategy here produces a score surface before it produces boxes, and right now that surface is
+discarded the instant peaks are extracted. That makes the threshold — the hardest parameter in the
+whole system — a bare number with no visual account of itself. Overlaying the response map on the
+drawing turns three failures that look identical in the output into three obviously different
+pictures:
+
+| Symptom | What the heatmap shows |
+|---|---|
+| A symbol was **missed** | No peak there at all — the template is wrong, or the instance differs |
+| A symbol was **cut** | A clear peak sitting just under the threshold — the cutoff is wrong |
+| Two symbols **merged** | Two adjacent peaks, one suppressed — the IoU threshold is wrong |
+
+Without it, all three read as "the count is low" and get debugged by guesswork.
+
+Notes for whoever builds it:
+
+- **Which map.** There is one per orientation. Thresholding operates on the per-pixel max across the
+  bank, so that is what should be displayed by default; a per-orientation view is a useful extra.
+- **Alignment.** `matchTemplate` returns a `(H-h+1, W-w+1)` map where entry `(x, y)` is the score for
+  the template's *top-left* at `(x, y)`. To overlay it centred on the symbols, offset by half the
+  template. Getting this wrong shifts the whole heatmap by half a symbol and looks like a
+  calibration bug.
+- **Size.** The raw map is float32 — about 71 MB for a D-size sheet with a small template. Do not put
+  that on the wire. Downsample, quantize to uint8, and send a PNG; the diagnostic value is in the
+  spatial pattern, not the precision.
+- **Delivery.** Cleanest as a separate `GET /api/detect/heatmap` keyed to a detection run, so the
+  normal response stays small and the map is fetched only when a debug view is open.
+- **Display.** Low-opacity colormap over the rendered page, with the current threshold as a contour
+  line. The contour is what makes the "peak just under the cut" case obvious at a glance.
 
 ---
 

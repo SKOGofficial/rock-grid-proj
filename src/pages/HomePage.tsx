@@ -46,7 +46,9 @@ function StrategyCard({ strategy }: { strategy: Strategy }) {
       <p className="strategy-card__tagline">{strategy.tagline}</p>
       <div className="strategy-card__foot">
         <span>{strategy.cost}</span>
-        <span className="strategy-card__cta">{ready ? 'Open →' : 'Read →'}</span>
+        <span className="strategy-card__cta">
+          {strategy.href === '/test' ? 'Open →' : 'Read →'}
+        </span>
       </div>
     </Link>
   )

@@ -85,11 +85,12 @@ export const STRATEGIES: Strategy[] = [
       'Sub-second per sheet; exact when scale and rotation are quantized, which they are.',
     ],
     risks: [
-      'Degrades once symbols overlap other geometry or carry differing interior text.',
-      'Needs per-symbol threshold calibration to avoid flooding on dense sheets.',
+      'Degrades once symbols overlap other geometry or carry differing interior text - measured, ' +
+        'conduit drawn through a symbol costs it enough score to fall below the cutoff.',
+      'The automatic cutoff is unreliable; move the slider rather than trusting the first number.',
     ],
-    cost: '~0.2-1 s per sheet on CPU.',
-    status: 'planned',
+    cost: '~1-2 s per sheet on CPU.',
+    status: 'ready',
     href: '/strategy/fft-ncc',
     glyph: '∿',
   },
