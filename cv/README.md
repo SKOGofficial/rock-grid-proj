@@ -1,6 +1,6 @@
 # Detection service
 
-The computer-vision half of One-Shot Takeoff. One endpoint, one implemented strategy.
+The computer-vision half of One-Shot Takeoff. One endpoint, two implemented strategies.
 
 The frontend runs separately (`npm run dev`) and Vite proxies `/api/detect` here. **Both processes
 have to be running** or the Find matches button reports the service as unreachable.
@@ -38,6 +38,7 @@ something else provides the boundary — a container, for instance.
 
 ```bash
 cv/.venv/Scripts/python -m cv.tests.test_postprocess
+cv/.venv/Scripts/python -m cv.tests.test_cc_match
 ```
 
 ```bash
@@ -79,8 +80,9 @@ actually applied.
 |---|---|
 | `app/raster.py` | PDF page → grayscale array, cached on the file's identity and mtime |
 | `app/fft_ncc.py` | Slices the template from that same array, correlates it across a rotation and reflection bank |
-| `app/postprocess.py` | Suppresses duplicates, picks a cutoff. No images — shared by every future strategy |
-| `app/main.py` | Validation, path safety, the wire contract |
+| `app/cc_match.py` | Labels connected ink components on the same array, verifies plausible ones with NCC |
+| `app/postprocess.py` | Suppresses duplicates, picks a cutoff. No images — shared by every strategy |
+| `app/main.py` | Validation, path safety, the wire contract, and which strategy id runs which matcher |
 
 Two decisions worth knowing before changing anything:
 
@@ -108,6 +110,10 @@ and every peak comes back already in page coordinates with no inverse transform 
 - **No masked correlation.** OpenCV accepts a mask only for `TM_SQDIFF` and `TM_CCORR_NORMED`, not
   the `TM_CCOEFF_NORMED` used here. This is what would separate detail markers from elevation
   markers, and stop conduit drawn through a symbol from costing it score.
+- **`connected-components` does not find doors.** A door's swing arc is drawn attached to the wall
+  by design, and the wall-stripping step that isolates every other symbol removes part of the door
+  along with the wall it's cutting away. Compact, isolated symbols — receptacles, markers — are what
+  it is for; FUTURE_WORK §10 has the per-symbol breakdown.
 - **PDF only.** Bitmap library files are listed by the frontend but cannot be searched.
 - **One page per request.** `scope: "document"` answers 501.
 - **No authentication, no rate limiting, no health endpoint.**
