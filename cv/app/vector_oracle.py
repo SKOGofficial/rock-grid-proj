@@ -44,10 +44,18 @@ DEFAULT_MAX_PRIMITIVE_EXTENT = 0.05
 
 #: Default gap for `cluster_primitives` - see that function for what the value controls.
 #:
-#: Measured against skanska-drawing-set.pdf: this is small enough to keep grid bubbles (page 4,
-#: true count 8) and a floor device (page 26, true count 24) as separate symbol-sized clusters
-#: rather than merging neighbours, while still bridging the broken strokes within one symbol.
-DEFAULT_GAP = 0.005
+#: 0.005 was the first value tried here, reasoned from symbol scale rather than measured, and it
+#: was wrong by a wide margin: against the real E4 floor-device exemplar (page 26, true count 24,
+#: the same exemplar documented in `cv/README.md`'s example request) it recovered only 6 of 24
+#: instances. The cause was not what it looked like at first glance - not conduit or wall lines
+#: bleeding into a symbol's cluster, but **adjacent floor devices touching each other**: this sheet
+#: places them only about 0.0047 apart edge to edge, well inside a 0.005 gap, so neighbouring
+#: instances were being merged pairwise into one oversized cluster (the merged sizes measured at
+#: 2.2-2.4x the exemplar's width, consistent with exactly two symbols fused). Sweeping `gap` down
+#: against that same exemplar: 0.0007 recovers 15, a stable plateau of 21 holds across
+#: 0.0002-0.0004, and 0.0001 spikes to 25 - a single value above the true count, more likely one
+#: spurious match than a better fit. 0.0003 sits in the middle of that plateau.
+DEFAULT_GAP = 0.0003
 
 #: Fixed cell size for the spatial hash in `cluster_primitives`, deliberately independent of
 #: `gap` - see that function's docstring for why the two must not be tied together. Sized
@@ -186,3 +194,58 @@ def cluster_primitives(boxes: Sequence[NormRect], *, gap: float = DEFAULT_GAP) -
         )
         for group in groups.values()
     ]
+
+
+#: Allowed fractional difference in width and height from the exemplar, in `match_exemplar`.
+#:
+#: Matches FUTURE_WORK.md S4b's raster connected-component filter exactly (bbox dimensions within
+#: 15%), so the two strategies stay comparable rather than diverging on an arbitrary tolerance.
+DEFAULT_BBOX_TOLERANCE = 0.15
+
+
+def match_exemplar(
+    clusters: Sequence[NormRect],
+    exemplar: NormRect,
+    *,
+    bbox_tolerance: float = DEFAULT_BBOX_TOLERANCE,
+) -> list[NormRect]:
+    """
+    Narrow clusters down to instances of one symbol.
+
+    Parameters:
+        clusters: candidate boxes from `cluster_primitives`.
+        exemplar: the box drawn around one instance of the symbol being counted.
+        bbox_tolerance: allowed fractional difference in width and height from the exemplar - see
+            `DEFAULT_BBOX_TOLERANCE`.
+    Returns:
+        Matching clusters, nearest-centre-to-the-exemplar first - so the exemplar's own cluster is
+        first in the list whenever it survives the filter.
+    Raises:
+        Nothing.
+    Summary:
+        `cluster_primitives` alone recovers a box per symbol, not a class label: two differently
+        shaped symbols of similar size land in indistinguishable clusters (see FUTURE_WORK.md S4e).
+        This is deliberately only a size gate, matching S4b's raster filter rather than improving
+        on it, so the two strategies can be measured against the same evaluation harness on equal
+        terms. A shape descriptor (primitive count, Hu/Zernike moments - FUTURE_WORK.md S2) is the
+        natural next filter if size alone proves too permissive on a real sheet.
+    """
+    exemplar_width = exemplar.x1 - exemplar.x0
+    exemplar_height = exemplar.y1 - exemplar.y0
+    exemplar_center = ((exemplar.x0 + exemplar.x1) / 2, (exemplar.y0 + exemplar.y1) / 2)
+
+    def close_enough(cluster: NormRect) -> bool:
+        width = cluster.x1 - cluster.x0
+        height = cluster.y1 - cluster.y0
+        return (
+            abs(width - exemplar_width) <= bbox_tolerance * exemplar_width
+            and abs(height - exemplar_height) <= bbox_tolerance * exemplar_height
+        )
+
+    def center_distance(cluster: NormRect) -> float:
+        center = ((cluster.x0 + cluster.x1) / 2, (cluster.y0 + cluster.y1) / 2)
+        return (
+            (center[0] - exemplar_center[0]) ** 2 + (center[1] - exemplar_center[1]) ** 2
+        ) ** 0.5
+
+    return sorted((c for c in clusters if close_enough(c)), key=center_distance)

@@ -384,6 +384,31 @@ any algorithmic choice in this document.
 > compared against an exemplar), but it still delivers the same three uses listed above, and it is
 > what this file actually permits. Implementation: `cv/app/vector_oracle.py`.
 
+> **Measured against the real exemplar, and the first clustering gap was wrong by a wide margin.**
+> `cv/README.md`'s example request is the E4 floor-device exemplar this document's own worked
+> example in S7 measures against (true count 24). Run through the oracle as first written
+> (`cluster_primitives(..., gap=0.005)` reasoned from symbol scale, not measured), it recovered
+> only **6 of 24** instances - `cv/.venv/Scripts/python -m cv.app.oracle_report
+> data/skanska-drawing-set.pdf 26 0.1317 0.2374 0.1407 0.2447`.
+>
+> The cause looked at first like the occlusion this section already names (conduit or a wall
+> bleeding into a symbol's cluster) but was not: it was **adjacent floor devices merging with each
+> other**. This sheet places them roughly 0.0047 apart edge to edge - comfortably inside a 0.005
+> gap - so neighbouring instances were fusing pairwise into one oversized cluster, measured at
+> 2.2-2.4x the exemplar's width, consistent with exactly two symbols joined. Sweeping the gap down
+> against the same exemplar found a stable plateau of 21/24 across 0.0002-0.0004 (0.0001 spikes to
+> 25 - one value past the true count, more likely a spurious match than a better fit), landing the
+> default at 0.0003. That takes the full pipeline - oracle vs. `fft-ncc`, scored by
+> `cv/app/evaluate.py` - from precision 0.042 / recall 0.167 to **precision 0.625 / recall 0.714**
+> on this sheet.
+>
+> Still short of the ceiling, and the remaining gap is informative rather than settled: 15 of the
+> 24 true positives matched at IoU >= 0.5, meaning the other agreed-upon locations disagree on the
+> box itself, most plausibly because the oracle reports the exact ink extent of a cluster while an
+> exemplar drawn by hand carries whatever margin the user happened to leave around the symbol. No
+> fix attempted yet - it needs a real exemplar-drawing workflow to characterize honestly, not
+> another guess.
+
 ---
 
 ## 7. The shared verification layer
