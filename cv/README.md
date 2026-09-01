@@ -45,6 +45,14 @@ cv/.venv/Scripts/python -m cv.tests.test_cc_match
 cv/.venv/Scripts/python -m cv.tests.test_fft_ncc
 ```
 
+```bash
+cv/.venv/Scripts/python -m cv.tests.test_vector_oracle
+```
+
+```bash
+cv/.venv/Scripts/python -m cv.tests.test_evaluate
+```
+
 No pytest needed, though it would collect them. Read the caveat in the root README before trusting
 a green run — they were written alongside the code they check.
 
@@ -80,8 +88,10 @@ actually applied.
 |---|---|
 | `app/raster.py` | PDF page → grayscale array, cached on the file's identity and mtime |
 | `app/fft_ncc.py` | Slices the template from that same array, correlates it across a rotation and reflection bank |
-| `app/cc_match.py` | Labels connected ink components on the same array, verifies plausible ones with NCC |
+| `app/cc_match.py` | Labels connected ink components on the *raster* array, verifies plausible ones with NCC |
 | `app/postprocess.py` | Suppresses duplicates, picks a cutoff. No images — shared by every strategy |
+| `app/vector_oracle.py` | Ground-truth boxes from connected components on the PDF's *vector* layer instead of the raster - for evaluation, not wired to the endpoint. Not `cc_match.py` under another name: exact geometry rather than pixels, and it produces labels to check a detector against rather than a detection itself |
+| `app/evaluate.py` | Precision/recall/F1 and count error, given any two box lists. No detector, no oracle — shared scoring |
 | `app/main.py` | Validation, path safety, the wire contract, and which strategy id runs which matcher |
 
 Two decisions worth knowing before changing anything:

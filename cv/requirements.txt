@@ -1,8 +1,8 @@
 # Detection service dependencies. Python 3.12.
 #
-# Deliberately five packages. Every strategy in FUTURE_WORK.md beyond fft-ncc will want more
-# (scipy, hnswlib, torch); none of them are here yet, and none should be added until the strategy
-# that needs them is actually being written.
+# Deliberately five packages plus pdfminer.six. Every strategy in FUTURE_WORK.md beyond fft-ncc
+# will want more (scipy, hnswlib, torch); none of them are here yet, and none should be added
+# until the strategy that needs them is actually being written.
 
 # PDF page -> raster. Chosen over PyMuPDF specifically: PyMuPDF is AGPL v3, which for a
 # closed-source or internal commercial tool requires a paid Artifex licence. pypdfium2 wraps
@@ -19,3 +19,11 @@ fastapi>=0.115,<1
 # Plain uvicorn, not uvicorn[standard]: the extras exist for reload-watching and uvloop, neither of
 # which a request/response service needs.
 uvicorn>=0.32,<1
+
+# Content-stream-level PDF access for the vector-layer oracle (FUTURE_WORK.md S4e). Not PyMuPDF,
+# for the same AGPL reason as above. Not pdfplumber either: its object model flattens straight to
+# rects/lines/curves/chars, which is all this needs, so depending on pdfminer.six directly (what
+# pdfplumber itself wraps) skips a layer. pypdfium2 cannot do this job - measured against the seed
+# PDF, its page-object API silently flattens Form XObjects, returning 0 FORM objects out of 29,284
+# on page 4.
+pdfminer.six>=20260101
