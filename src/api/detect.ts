@@ -11,7 +11,7 @@
  *   that case gets its own message rather than surfacing as a bare "Failed to fetch".
  */
 
-import type { DetectRequest, DetectResponse, Selection } from '../types'
+import type { DetectOptions, DetectRequest, DetectResponse, Selection } from '../types'
 
 /**
  * Resolution the backend searches at.
@@ -22,6 +22,26 @@ import type { DetectRequest, DetectResponse, Selection } from '../types'
  * close enough together to be confused once already.
  */
 export const SEARCH_DPI = 150
+
+/**
+ * Options applied to every run unless a caller overrides them.
+ *
+ * `mirror` is on deliberately, and this constant is the whole of the fix for reflected symbols.
+ * The matcher has always been able to search them - the bank in `_oriented_templates` covers all
+ * eight orientations of the square - but nothing ever asked it to, so the app searched four.
+ *
+ * Leaving reflections out does not fail loudly, which is why it went unnoticed. A mirrored
+ * instance still correlates against the unmirrored template - by however much the symbol resembles
+ * its own reflection - so it lands in the reply as a second cluster below the upright instances.
+ * A gap between two clusters is precisely what the service's automatic cutoff looks for, so the
+ * usual outcome is a confident count with the mirrored instances ranked, then cut. Doors and
+ * similar symbols are placed mirrored as a matter of course.
+ *
+ * The cost is a second pass over the same page - roughly double the elapsed time - and on *chiral*
+ * symbols, anything carrying text or digits, a mirrored hit is a false positive rather than an
+ * instance. That is what the toggle in the results panel is for.
+ */
+export const DEFAULT_DETECT_OPTIONS: DetectOptions = { mirror: true }
 
 /** Thrown for any strategy whose backend does not exist yet - the service's 501. */
 export class NotImplementedError extends Error {
@@ -49,6 +69,7 @@ export class ServiceUnavailableError extends Error {
  *   strategyId: which strategy to run.
  *   selection: the exemplar the user drew.
  *   scope: `page` to search only the exemplar's page. `document` is not implemented.
+ *   options: overrides layered over `DEFAULT_DETECT_OPTIONS`.
  * Returns:
  *   A `DetectRequest` ready to post.
  * Raises:
@@ -57,11 +78,17 @@ export class ServiceUnavailableError extends Error {
  *   Carries the normalized box and a DPI, never pixels. The backend re-rasterizes both the page
  *   and the template from the same source at the same resolution, which is what guarantees they
  *   cannot differ in scale - and normalized cross-correlation is not scale-invariant.
+ *
+ *   Options are merged here rather than assembled at the call site so that every request carries
+ *   the defaults. Setting only the option you care about used to mean sending only that option,
+ *   which is how mirroring stayed off: the one caller set `includeHeatmap` and nothing else, and
+ *   the service's own default supplied the rest.
  */
 export function buildDetectRequest(
   strategyId: string,
   selection: Selection,
   scope: 'page' | 'document' = 'page',
+  options: DetectOptions = {},
 ): DetectRequest {
   return {
     strategyId,
@@ -70,6 +97,7 @@ export function buildDetectRequest(
     bbox: selection.rect,
     dpi: SEARCH_DPI,
     scope,
+    options: { ...DEFAULT_DETECT_OPTIONS, ...options },
   }
 }
 

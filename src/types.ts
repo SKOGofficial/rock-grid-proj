@@ -127,6 +127,8 @@ export interface DetectMatch {
   score: number
   /** Rotation of the match relative to the exemplar, if the strategy searched rotations. */
   rotationDeg?: number
+  /** True when this instance was found via a reflected orientation rather than a plain rotation. */
+  mirrored?: boolean
 }
 
 /** What a strategy returns. */
@@ -136,10 +138,14 @@ export interface DetectResponse {
    * Every candidate scoring at or above `floorUsed`, best first.
    *
    * Deliberately longer than `count`: this carries the candidates on *both* sides of the cutoff.
-   * The cutoff is the least reliable number the service produces - on a measured sheet the derived
-   * one returned 21 where the answer was 24 - so shipping only the survivors would hand the UI a
-   * number it could not interrogate. Filtering client-side instead makes a threshold slider
-   * instant, with no second request and no re-correlation.
+   * The cutoff is the least reliable number the service produces - on grid bubbles the derived one
+   * returns 75 where the answer is 8 - so shipping only the survivors would hand the UI a number
+   * it could not interrogate. Filtering client-side instead makes a threshold slider instant, with
+   * no second request and no re-correlation.
+   *
+   * The sheet E4 case once cited alongside that one - 21 where the answer was 24 - is no longer
+   * evidence for it. Those three instances were mirrored, not mis-thresholded; see
+   * `DEFAULT_DETECT_OPTIONS` in `src/api/detect.ts`.
    */
   matches: DetectMatch[]
   /** How many of `matches` score at or above `thresholdUsed`. This is the answer. */

@@ -26,6 +26,11 @@ interface ResultsPanelProps {
   onToggleHeatmap: () => void
   /** True while a run is fetching the response map after the heatmap toggle was switched on. */
   heatmapPending: boolean
+  /** Whether reflections are being searched as well as rotations. */
+  mirror: boolean
+  onToggleMirror: () => void
+  /** True while the run triggered by moving the mirror toggle is in flight. */
+  mirrorPending: boolean
   onClear: () => void
 }
 
@@ -53,6 +58,9 @@ export function ResultsPanel({
   showHeatmap,
   onToggleHeatmap,
   heatmapPending,
+  mirror,
+  onToggleMirror,
+  mirrorPending,
   onClear,
 }: ResultsPanelProps) {
   const counted = detection.matches.filter((match) => match.score >= threshold).length
@@ -119,6 +127,20 @@ export function ResultsPanel({
             disabled={heatmapPending}
           />
           {heatmapPending ? 'Heatmap...' : 'Heatmap'}
+        </label>
+        {/*
+          The odd one out: the two above change what is drawn, this changes what was searched for,
+          so moving it costs a round trip in either direction. Titled rather than labelled with the
+          caveat, because the caveat is long and the common case is leaving it on.
+        */}
+        <label title="Also search reflected orientations. Re-runs the search; turn it off for symbols carrying text or digits, where a mirrored hit is a false positive.">
+          <input
+            type="checkbox"
+            checked={mirror}
+            onChange={onToggleMirror}
+            disabled={mirrorPending}
+          />
+          {mirrorPending ? 'Mirrored...' : 'Mirrored'}
         </label>
       </div>
 

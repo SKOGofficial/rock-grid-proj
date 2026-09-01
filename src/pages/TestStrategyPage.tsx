@@ -75,6 +75,13 @@ export function TestStrategyPage() {
   const [thresholdOverride, setThresholdOverride] = useState<number | null>(null)
   const [showNearMisses, setShowNearMisses] = useState(true)
   const [showHeatmap, setShowHeatmap] = useState(false)
+  /**
+   * Whether the search covers reflections as well as rotations.
+   *
+   * On by default - see `DEFAULT_DETECT_OPTIONS`. Unlike the two flags above this is not a view
+   * setting: it changes what the service looks for, so changing it costs a run.
+   */
+  const [mirror, setMirror] = useState(true)
 
   /** Guards against an out-of-order crop resolving after a newer one. */
   const selectionTokenRef = useRef(0)
@@ -195,8 +202,27 @@ export function TestStrategyPage() {
     setDetecting(false)
   }, [])
 
+  /**
+   * Run detection.
+   *
+   * Parameters:
+   *   run.heatmap: ask for the correlation response map as well as the matches.
+   *   run.mirror: search reflected orientations alongside the rotations.
+   *   run.keepThreshold: leave a cutoff the user has already chosen alone.
+   * Returns:
+   *   Nothing; results land in state.
+   * Raises:
+   *   Nothing; failures land in `detectError`.
+   * Summary:
+   *   An object rather than positional booleans. There are three call sites and three flags now,
+   *   and `runDetection(true, false, true)` at a call site says nothing about what it does.
+   *
+   *   The flags are arguments rather than reads of component state because every caller is a
+   *   toggle handler acting on the *next* value: `setMirror` has not landed by the time this runs,
+   *   so reading state here would run the setting the user just moved away from.
+   */
   const runDetection = useCallback(
-    (withHeatmap: boolean, keepThreshold = false) => {
+    (run: { heatmap: boolean; mirror: boolean; keepThreshold?: boolean }) => {
       if (!selection) return
       // A superseded run must not land after a newer one and overwrite it.
       detectAbortRef.current?.abort()
@@ -206,8 +232,13 @@ export function TestStrategyPage() {
       setDetecting(true)
       setDetectError(null)
 
-      const request = buildDetectRequest(STRATEGY_ID, selection)
-      if (withHeatmap) request.options = { includeHeatmap: true }
+      // Built with its options rather than mutated afterwards. Assigning `request.options`
+      // replaces the whole object, so the previous `request.options = { includeHeatmap: true }`
+      // would have dropped `mirror` on exactly the runs that asked for both.
+      const request = buildDetectRequest(STRATEGY_ID, selection, 'page', {
+        mirror: run.mirror,
+        includeHeatmap: run.heatmap,
+      })
 
       runStrategy(request, controller.signal)
         .then((response) => {
@@ -215,7 +246,7 @@ export function TestStrategyPage() {
           setDetection(response)
           // A run triggered only to fetch the response map must not throw away a cutoff the user
           // has already chosen - toggling a view should not silently change the count.
-          if (!keepThreshold) setThresholdOverride(null)
+          if (!run.keepThreshold) setThresholdOverride(null)
         })
         .catch((cause: unknown) => {
           if (controller.signal.aborted) return
@@ -235,8 +266,29 @@ export function TestStrategyPage() {
   const handleToggleHeatmap = useCallback(() => {
     const next = !showHeatmap
     setShowHeatmap(next)
-    if (next && detection && !detection.heatmapPng) runDetection(true, true)
-  }, [detection, runDetection, showHeatmap])
+    if (next && detection && !detection.heatmapPng) {
+      runDetection({ heatmap: true, mirror, keepThreshold: true })
+    }
+  }, [detection, mirror, runDetection, showHeatmap])
+
+  /**
+   * Mirroring is a search setting, not a view setting, so both directions need a fresh run.
+   *
+   * The heatmap toggle turns off for free - the map is already in hand and simply stops being
+   * drawn. This one cannot be served from the reply already held in either direction: turning it
+   * on has to go and find the reflected instances, and turning it off has to actually remove them
+   * from the answer rather than merely stop drawing them.
+   *
+   * The user's cutoff survives, for the same reason it survives a heatmap toggle - it is a score,
+   * still meaningful against the new candidate set, and flipping a mode should not silently move a
+   * number the user chose. The *derived* cutoff will move, because eight orientations roughly
+   * double the background population the knee search examines; the auto button shows where it went.
+   */
+  const handleToggleMirror = useCallback(() => {
+    const next = !mirror
+    setMirror(next)
+    if (detection) runDetection({ heatmap: showHeatmap, mirror: next, keepThreshold: true })
+  }, [detection, mirror, runDetection, showHeatmap])
 
   useEffect(() => () => detectAbortRef.current?.abort(), [])
 
@@ -354,7 +406,7 @@ export function TestStrategyPage() {
           <SelectionChip
             selection={selection}
             onClear={handleClearSelection}
-            onDetect={() => runDetection(showHeatmap)}
+            onDetect={() => runDetection({ heatmap: showHeatmap, mirror })}
             detecting={detecting}
             error={detectError}
           />
@@ -371,6 +423,9 @@ export function TestStrategyPage() {
             showHeatmap={showHeatmap}
             onToggleHeatmap={handleToggleHeatmap}
             heatmapPending={detecting}
+            mirror={mirror}
+            onToggleMirror={handleToggleMirror}
+            mirrorPending={detecting}
             onClear={clearDetection}
           />
         )}

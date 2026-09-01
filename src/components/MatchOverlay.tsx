@@ -5,10 +5,13 @@
  *   Two states, and the second is the point. Candidates at or above the cutoff are drawn solid and
  *   counted; candidates below it are drawn faintly and are not.
  *
- *   Showing the near misses is what the service's oversized reply buys. Measured on one sheet, the
- *   derived cutoff returned 21 where the true answer was 24 - and the three it missed sat directly
- *   beneath the line, with one genuine false positive among them. Drawn, that boundary is a
- *   judgement the user can make in a glance. Hidden, it is a number with nothing behind it.
+ *   Showing the near misses is what the service's oversized reply buys: drawn, the boundary is a
+ *   judgement the user can make in a glance; hidden, it is a number with nothing behind it.
+ *
+ *   It also earned its keep as a diagnostic. The three instances that sat just beneath the line on
+ *   sheet E4 - long read as the cutoff being set slightly too high - were visibly the *mirrored*
+ *   ones once drawn, which is how the missing reflections in the orientation bank were found at
+ *   all. A count alone would never have shown that; three faint boxes in a row did.
  *
  *   Positions come from the same normalized rectangles the exemplar uses, so matches track the
  *   drawing through zoom and resize without any work here.
@@ -70,7 +73,7 @@ export function MatchOverlay({
             }}
             title={`score ${match.score.toFixed(3)}${
               match.rotationDeg ? ` · ${match.rotationDeg}°` : ''
-            }${counted ? '' : ' · below cutoff'}`}
+            }${match.mirrored ? ' · mirrored' : ''}${counted ? '' : ' · below cutoff'}`}
           />
         )
       })}
