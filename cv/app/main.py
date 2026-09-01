@@ -37,7 +37,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
-from .fft_ncc import DEFAULT_DPI, DEFAULT_MIRROR, DEFAULT_ROTATIONS, NormRect, find_matches
+from . import cc_match
+from .fft_ncc import DEFAULT_DPI, DEFAULT_MIRROR, DEFAULT_ROTATIONS, NormRect
+from .fft_ncc import find_matches as fft_ncc_find_matches
 from .postprocess import DEFAULT_FLOOR, DEFAULT_IOU, MAX_MATCHES, choose_threshold
 
 #: Extensions the detector can open. Bitmap library files are not handled yet.
@@ -48,9 +50,15 @@ DATA_DIR = Path(
     os.environ.get("DATA_DIR", Path(__file__).resolve().parents[2] / "data")
 ).resolve()
 
-#: Strategy ids with a backend. Everything else in `src/strategies/registry.ts` answers 501, which
-#: is what `NotImplementedError` in `src/api/detect.ts` exists to be thrown on.
-IMPLEMENTED_STRATEGIES = {"fft-ncc"}
+#: One matcher per strategy id with a backend. Every entry has the exact signature
+#: `fft_ncc.find_matches` does, so `detect()` below calls whichever was asked for identically.
+#: Everything else in `src/strategies/registry.ts` answers 501, which is what `NotImplementedError`
+#: in `src/api/detect.ts` exists to be thrown on.
+STRATEGY_MATCHERS = {
+    "fft-ncc": fft_ncc_find_matches,
+    "connected-components": cc_match.find_matches,
+}
+IMPLEMENTED_STRATEGIES = set(STRATEGY_MATCHERS)
 
 app = FastAPI(title="One-Shot Takeoff detection service", version="0.1.0")
 
@@ -279,9 +287,10 @@ def detect(request: DetectRequest) -> DetectResponse:
     document = resolve_document(request.file_name)
     options = request.options
     started = time.perf_counter()
+    matcher = STRATEGY_MATCHERS[request.strategy_id]
 
     try:
-        result = find_matches(
+        result = matcher(
             document,
             request.page,
             NormRect(request.bbox.x0, request.bbox.y0, request.bbox.x1, request.bbox.y1),

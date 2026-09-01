@@ -22,10 +22,21 @@ import { buildDetectRequest, runStrategy } from '../api/detect'
 import { createSelection } from '../lib/crop'
 import { clamp } from '../lib/geometry'
 import { openDocument, type RenderSource } from '../lib/source'
+import { STRATEGIES } from '../strategies/registry'
 import type { DetectResponse, LibraryFile, NormRect, PageSize, Selection } from '../types'
 
-/** The only strategy with a backend today. */
-const STRATEGY_ID = 'fft-ncc'
+/**
+ * Strategies this workspace can send a detection request to.
+ *
+ * `test-strategy` is itself `status: 'ready'` in the registry - it is this very page - but it
+ * detects nothing, so it is excluded here rather than offered as something to run.
+ */
+const RUNNABLE_STRATEGIES = STRATEGIES.filter(
+  (strategy) => strategy.status === 'ready' && strategy.id !== 'test-strategy',
+)
+
+/** The strategy the workspace opens with. Preserves prior behavior for anyone with this page open. */
+const DEFAULT_STRATEGY_ID = 'fft-ncc'
 
 const MIN_ZOOM = 0.05
 const MAX_ZOOM = 12
@@ -57,6 +68,7 @@ export function TestStrategyPage() {
   const [pageSize, setPageSize] = useState<PageSize | null>(null)
   const [zoom, setZoom] = useState(1)
   const [mode, setMode] = useState<ViewerMode>('select')
+  const [strategyId, setStrategyId] = useState(DEFAULT_STRATEGY_ID)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [viewport, setViewport] = useState<PageSize | null>(null)
 
@@ -235,7 +247,7 @@ export function TestStrategyPage() {
       // Built with its options rather than mutated afterwards. Assigning `request.options`
       // replaces the whole object, so the previous `request.options = { includeHeatmap: true }`
       // would have dropped `mirror` on exactly the runs that asked for both.
-      const request = buildDetectRequest(STRATEGY_ID, selection, 'page', {
+      const request = buildDetectRequest(strategyId, selection, 'page', {
         mirror: run.mirror,
         includeHeatmap: run.heatmap,
       })
@@ -256,7 +268,16 @@ export function TestStrategyPage() {
           if (!controller.signal.aborted) setDetecting(false)
         })
     },
-    [selection],
+    [selection, strategyId],
+  )
+
+  /** A result belongs to the strategy that produced it, so switching strategies discards it. */
+  const handleStrategyChange = useCallback(
+    (nextStrategyId: string) => {
+      setStrategyId(nextStrategyId)
+      clearDetection()
+    },
+    [clearDetection],
   )
 
   /**
@@ -378,6 +399,9 @@ export function TestStrategyPage() {
           mode={mode}
           onModeChange={setMode}
           disabled={!ready}
+          strategyId={strategyId}
+          strategyOptions={RUNNABLE_STRATEGIES}
+          onStrategyChange={handleStrategyChange}
         />
 
         <DocumentCanvas

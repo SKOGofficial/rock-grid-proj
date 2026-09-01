@@ -27,6 +27,11 @@ interface ViewerToolbarProps {
   mode: ViewerMode
   onModeChange: (mode: ViewerMode) => void
   disabled: boolean
+  /** Detection strategy in force. `undefined` when no strategy has a backend to choose from yet. */
+  strategyId?: string
+  /** Strategies with a backend - the only ones a run can actually be sent to. */
+  strategyOptions?: { id: string; name: string }[]
+  onStrategyChange?: (strategyId: string) => void
 }
 
 /**
@@ -57,6 +62,9 @@ export function ViewerToolbar({
   mode,
   onModeChange,
   disabled,
+  strategyId,
+  strategyOptions,
+  onStrategyChange,
 }: ViewerToolbarProps) {
   const [pageDraft, setPageDraft] = useState(String(page))
 
@@ -184,6 +192,24 @@ export function ViewerToolbar({
           Pan
         </button>
       </div>
+
+      {strategyOptions && strategyOptions.length > 1 && onStrategyChange && (
+        <div className="toolbar__group">
+          <select
+            className="tool-button"
+            value={strategyId}
+            disabled={disabled}
+            aria-label="Detection strategy"
+            onChange={(event) => onStrategyChange(event.target.value)}
+          >
+            {strategyOptions.map((strategy) => (
+              <option key={strategy.id} value={strategy.id}>
+                {strategy.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <span className="toolbar__spacer" />
       {fileName && <span className="toolbar__filename">{fileName}</span>}

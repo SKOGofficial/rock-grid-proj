@@ -174,7 +174,7 @@ export const STRATEGIES: Strategy[] = [
       'Poorly suited to doors, whose swing arc connects to the wall by design.',
     ],
     cost: '~50-200 ms per sheet.',
-    status: 'planned',
+    status: 'ready',
     href: '/strategy/connected-components',
     glyph: '▦',
   },
