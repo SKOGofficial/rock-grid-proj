@@ -37,7 +37,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
-from .fft_ncc import DEFAULT_DPI, DEFAULT_ROTATIONS, NormRect, find_matches
+from .fft_ncc import DEFAULT_DPI, DEFAULT_MIRROR, DEFAULT_ROTATIONS, NormRect, find_matches
 from .postprocess import DEFAULT_FLOOR, DEFAULT_IOU, MAX_MATCHES, choose_threshold
 
 #: Extensions the detector can open. Bitmap library files are not handled yet.
@@ -94,7 +94,9 @@ class DetectOptions(ApiModel):
     floor: float = Field(default=DEFAULT_FLOOR, ge=0.0, le=1.0)
     iou_threshold: float = Field(default=DEFAULT_IOU, ge=0.0, le=1.0)
     rotations: list[int] = Field(default_factory=lambda: list(DEFAULT_ROTATIONS))
-    mirror: bool = False
+    #: Search reflections as well as rotations. Defaulted from the matcher rather than restated, so
+    #: a request that omits options behaves exactly like one the app sent.
+    mirror: bool = DEFAULT_MIRROR
     max_matches: int = Field(default=MAX_MATCHES, ge=1, le=20_000)
     #: Return the correlation response map too. Off by default - it costs a page-sized float32
     #: accumulation and a PNG encode, and most runs do not want it.
@@ -129,6 +131,8 @@ class DetectMatch(ApiModel):
     page: int
     score: float
     rotation_deg: int | None = None
+    #: Whether this instance was found via a reflected orientation rather than a plain rotation.
+    mirrored: bool = False
 
 
 class DetectResponse(ApiModel):
@@ -139,11 +143,20 @@ class DetectResponse(ApiModel):
         `matches` holds **every** candidate down to `floorUsed`, not only those above
         `thresholdUsed`, so `len(matches)` is deliberately larger than `count`.
 
-        That is a considered choice. The cutoff is the least reliable number the service produces -
-        on a measured sheet the derived one returned 21 where the answer was 24, and no single
-        cutoff could return 24 without also admitting a false positive. Shipping only the survivors
-        would make that a number nobody can interrogate. Shipping everything lets the UI move a
-        threshold slider and re-count instantly, with no round trip and no re-correlation.
+        That is a considered choice. The cutoff is still the least reliable number the service
+        produces - on grid bubbles the derived one returns 75 where the answer is 8. Shipping only
+        the survivors would make that a number nobody can interrogate. Shipping everything lets the
+        UI move a threshold slider and re-count instantly, with no round trip and no
+        re-correlation.
+
+        The sheet E4 case that used to be cited here - 21 where the answer was 24, and "no single
+        cutoff could return 24 without also admitting a false positive" - was misattributed. The
+        three missing instances were mirrored, and the bank searched only rotations, so no cutoff
+        could have recovered them and the threshold was never the culprit. With reflections
+        searched, the same derived cutoff of 0.700 returns 24. Worth remembering the next time this
+        response's shape is justified: the argument for it stands on the grid-bubble case, and one
+        of its two supporting measurements turned out to be a different bug wearing a cutoff's
+        clothes.
     """
 
     strategy_id: str
@@ -308,6 +321,7 @@ def detect(request: DetectRequest) -> DetectResponse:
             page=request.page,
             score=candidate.score,
             rotation_deg=candidate.rotation_deg,
+            mirrored=candidate.mirrored,
         )
         for candidate in result.detections.matches
     ]

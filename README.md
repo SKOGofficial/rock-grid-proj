@@ -46,9 +46,13 @@ so plainly rather than failing obscurely.
   that scored just under the line.
 
 > [!NOTE]
-> **The automatic cutoff is not trustworthy yet.** Measured on the seed set it returns 21 where the
-> answer is 24, and on grid bubbles 75 where the answer is 8. That is why the slider exists and why
-> the reply carries candidates on both sides of the line. FUTURE_WORK §7 has the measurements.
+> **The automatic cutoff is not trustworthy yet.** On grid bubbles it returns 75 where the answer
+> is 8. That is why the slider exists and why the reply carries candidates on both sides of the
+> line. FUTURE_WORK §7 has the measurements.
+>
+> The seed-set "21 where the answer is 24" that used to sit beside it has been struck: those three
+> instances were mirrored, and the orientation bank searched rotations only. Searching reflections
+> returns 24 at the same derived cutoff.
 
 ## The database is a directory
 

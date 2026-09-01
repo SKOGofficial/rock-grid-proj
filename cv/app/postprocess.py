@@ -33,10 +33,20 @@ import numpy as np
 #: report matches on a sheet that contains none.
 #:
 #: This was 0.5 until measurement showed that was already discarding true instances. Searching for
-#: a floor device on sheet E4, three genuine matches scored 0.541, 0.538 and 0.494 - depressed by
-#: conduit stubs drawn through the template window - so the last was cut before anything downstream
-#: could weigh it. The floor is meant to bound absurdity, not to decide the answer; 0.35 leaves the
-#: judgement to the threshold, where a reviewer can see and move it.
+#: a floor device on sheet E4, three genuine matches scored 0.541, 0.538 and 0.494 - so the last
+#: was cut before anything downstream could weigh it. The floor is meant to bound absurdity, not to
+#: decide the answer; 0.35 leaves the judgement to the threshold, where a reviewer can see and
+#: move it.
+#:
+#: Those three scores were originally read as conduit stubs drawn through the template window
+#: depressing an otherwise clean match. That was wrong. They are the same three instances, and they
+#: are *mirrored* - the bank had no reflected orientation to score them against, so what was
+#: measured was the symbol's correlation with its own reflection. Searching reflections
+#: (`DEFAULT_MIRROR`) lifts the identical three to 0.816, 0.800 and 0.762 at 180 degrees.
+#:
+#: The value stays at 0.35 regardless. The reasoning that produced it was faulty but the number is
+#: still the conservative one, and raising it back to 0.5 on the strength of one sheet would be
+#: repeating the original mistake in the other direction.
 DEFAULT_FLOOR = 0.35
 
 #: Intersection-over-union above which two boxes are treated as the same detection.
@@ -67,6 +77,8 @@ class Candidate(NamedTuple):
     height: int
     score: float
     rotation_deg: int = 0
+    #: Whether this peak came from a reflected orientation. See `fft_ncc._oriented_templates`.
+    mirrored: bool = False
 
 
 class Detections(NamedTuple):

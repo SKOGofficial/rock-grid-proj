@@ -14,11 +14,15 @@ Summary:
     differently from the page loses score on every candidate. Slicing makes that impossible.
 
     The template rotates, not the page. The template is a few tens of kilobytes and the page is
-    19 megapixels, so rotating the small one four times is free - but the real reason is
+    19 megapixels, so reorienting the small one eight times is free - but the real reason is
     coordinates. Every peak comes back already in page space, with no inverse transform to get
     wrong. `np.rot90` at 90-degree multiples is a lossless reindexing; arbitrary angles would need
     interpolation, which softens 1-2 pixel CAD strokes and degrades every candidate rather than
     just the rotated ones.
+
+    Eight, not four, because the bank covers reflections too - see `DEFAULT_MIRROR`. Leaving them
+    out does not lose a mirrored instance outright; it demotes it into a cluster below the upright
+    ones, where the automatic cutoff then cuts it.
 """
 
 from __future__ import annotations
@@ -48,9 +52,28 @@ DEFAULT_DPI = 150.0
 
 #: Rotations searched by default.
 #:
-#: CAD blocks snap to orthogonal walls, so these four cover the overwhelming majority. Mirroring
-#: is off by default: it doubles the work again, and chiral symbols should not mirror.
+#: CAD blocks snap to orthogonal walls, so these four cover the overwhelming majority.
 DEFAULT_ROTATIONS: tuple[int, ...] = (0, 90, 180, 270)
+
+#: Whether reflections are searched alongside those rotations, by default.
+#:
+#: On, because leaving them out does not fail loudly. Every instance of a symbol is the same CAD
+#: block, so against the right orientation each scores essentially 1.0 - but a rotation-only bank
+#: has no right orientation for a reflected instance, and scores it by however self-similar the
+#: symbol happens to be to its own reflection. On a synthetic 'F' that is 0.894
+#: (`cv/tests/test_fft_ncc.py`); on a strongly chiral mark it is far lower.
+#:
+#: Well above the floor either way, which is the awkward part. The reflected instances are not
+#: absent from the result, they form a second cluster beneath the upright ones - and a gap between
+#: two clusters is exactly what `choose_threshold` hunts for when deciding where instances stop.
+#: So a rotation-only run tends to find the mirrored symbols, rank them last, and then cut them,
+#: reporting a confident count that is short by however many were mirrored.
+#:
+#: Turning it on collapses the two clusters into one. The cost is why this stays a knob: it doubles
+#: the correlation work, and on symbols carrying text or digits a mirrored hit is a false positive
+#: rather than an instance. `DEFAULT_ROTATIONS` plus this gives all eight orientations of the
+#: square - four rotations, and `fliplr` composed with each.
+DEFAULT_MIRROR = True
 
 #: Smallest usable template edge, in pixels. Below this a correlation score means very little.
 MIN_TEMPLATE_EDGE = 8
@@ -200,7 +223,7 @@ def find_matches(
     *,
     dpi: float = DEFAULT_DPI,
     rotations: Sequence[int] = DEFAULT_ROTATIONS,
-    mirror: bool = False,
+    mirror: bool = DEFAULT_MIRROR,
     threshold: float | None = None,
     floor: float = DEFAULT_FLOOR,
     iou_threshold: float = DEFAULT_IOU,
@@ -216,7 +239,8 @@ def find_matches(
         bbox: the exemplar region, in normalized page coordinates.
         dpi: search resolution. May be reduced for very large sheets; the value used is returned.
         rotations: angles to search, in degrees. Must be multiples of 90.
-        mirror: also search a horizontally flipped copy of each rotation.
+        mirror: also search a horizontally flipped copy of each rotation. On by default; see
+            `DEFAULT_MIRROR` for what it costs and when to turn it off.
         threshold: explicit score cutoff; `None` derives one from the distribution.
         floor, iou_threshold, max_matches: passed through to `finalize`.
     Returns:
@@ -295,12 +319,10 @@ def find_matches(
                     width=oriented_width,
                     height=oriented_height,
                     score=float(score),
-                    # Mirroring has nowhere to go in the wire contract yet, so a mirrored hit is
-                    # reported by its rotation alone. Harmless while mirror defaults to off.
                     rotation_deg=int(degrees),
+                    mirrored=bool(mirrored),
                 )
             )
-        del mirrored
 
     detections = finalize(
         candidates,
